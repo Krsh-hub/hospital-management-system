@@ -49,6 +49,10 @@ function notify(userId, title, message) {
   if (userId) db.prepare('INSERT INTO notifications(user_id, title, message) VALUES (?, ?, ?)').run(userId, title, message);
 }
 const patientUserId = pid => db.prepare("SELECT id FROM users WHERE patient_id = ? AND role = 'patient'").get(pid)?.id;
+function notifyBilling(patient, doctorName) {
+  for (const u of db.prepare("SELECT id FROM users WHERE role = 'accountant' AND active = 1").all())
+    notify(u.id, 'Ready for billing', `Consultation of ${patient.name} (${patient.uid}) with ${doctorName} is completed.`);
+}
 
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body || {};
@@ -185,7 +189,26 @@ app.get('/api/patients/:id', auth(), (req, res) => {
     appointments: db.prepare(`${APPT_SQL} WHERE a.patient_id = ? ORDER BY a.date DESC, a.time DESC`).all(id),
     records: canRecords ? db.prepare(`${REC_SQL} WHERE r.patient_id = ? ORDER BY r.visit_date DESC, r.id DESC`).all(id) : null,
     bills: canBills ? db.prepare(`${BILL_SQL} WHERE b.patient_id = ? ORDER BY b.id DESC`).all(id) : null,
+    account: ['admin', 'receptionist'].includes(req.user.role)
+      ? db.prepare("SELECT username, active FROM users WHERE patient_id = ? AND role = 'patient'").get(id) || null : undefined,
   });
+});
+
+// Patient portal login, created by admin or reception for a registered patient
+app.post('/api/patients/:id/account', auth('admin', 'receptionist'), (req, res) => {
+  const patient = db.prepare('SELECT * FROM patients WHERE id = ?').get(req.params.id);
+  if (!patient) return bad(res, 'Patient not found', 404);
+  if (patientUserId(patient.id)) return bad(res, 'This patient already has a portal login');
+  const username = String(req.body?.username || '').trim().toLowerCase();
+  const password = req.body?.password || '';
+  if (!/^[a-z0-9._]{3,30}$/.test(username)) return bad(res, 'Username must be 3–30 characters (letters, digits, . or _)');
+  if (password.length < 6) return bad(res, 'Password must be at least 6 characters');
+  if (db.prepare('SELECT 1 FROM users WHERE username = ?').get(username)) return bad(res, 'Username is already taken');
+  const { salt, hash } = hashPassword(password);
+  const id = Number(db.prepare(`INSERT INTO users(username, password_hash, salt, name, role, email, phone, patient_id)
+    VALUES (?, ?, ?, ?, 'patient', ?, ?, ?)`).run(username, hash, salt, patient.name, patient.email, patient.phone, patient.id).lastInsertRowid);
+  notify(id, 'Welcome to MediCore HMS', `Your patient portal account was created by ${req.user.name}. You can book appointments and view your records and bills here.`);
+  res.json({ ok: true, username });
 });
 
 app.post('/api/patients', auth('admin', 'receptionist'), (req, res) => {
@@ -216,6 +239,7 @@ app.delete('/api/patients/:id', auth('admin'), (req, res) => {
   const id = req.params.id;
   const used = db.prepare('SELECT (SELECT COUNT(*) FROM appointments WHERE patient_id = ?) + (SELECT COUNT(*) FROM bills WHERE patient_id = ?) AS c').get(id, id).c;
   if (used) return bad(res, 'Cannot delete a patient who has appointments or bills (records are retained for integrity)');
+  if (patientUserId(id)) return bad(res, 'Cannot delete a patient who has a portal login');
   db.prepare('DELETE FROM patients WHERE id = ?').run(id);
   res.json({ ok: true });
 });
@@ -315,6 +339,7 @@ app.put('/api/appointments/:id', auth(), (req, res) => {
     if (role !== 'patient') notify(pUser, 'Appointment cancelled', msg);
   } else {
     db.prepare("UPDATE appointments SET status = 'Completed' WHERE id = ?").run(a.id);
+    notifyBilling({ name: a.patient_name, uid: a.patient_uid }, a.doctor_name);
   }
   res.json({ ok: true });
 });
@@ -359,10 +384,7 @@ app.post('/api/records', auth('doctor'), (req, res) => {
     return id;
   });
   notify(patientUserId(patient.id), 'Medical record updated', `${req.user.name} added a new record: ${v(b.diagnosis)}.`);
-  if (appt && b.complete_appointment) {
-    for (const u of db.prepare("SELECT id FROM users WHERE role = 'accountant' AND active = 1").all())
-      notify(u.id, 'Ready for billing', `Consultation of ${patient.name} (${patient.uid}) with ${req.user.name} is completed.`);
-  }
+  if (appt && b.complete_appointment) notifyBilling(patient, req.user.name);
   res.json({ id });
 });
 

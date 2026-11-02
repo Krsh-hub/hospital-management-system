@@ -218,6 +218,7 @@ const ACTIONS = {
   'bill-from-appt': id => { const a = state.cache.appt[id]; billForm({ patientId: a.patient_id, appointmentId: a.id }); },
   'patient-new': () => patientForm(),
   'patient-edit': id => patientForm(state.cache.patient[id]),
+  'patient-account': id => portalAccountForm(state.cache.patient[id]),
   'staff-new': () => staffForm(),
   'staff-edit': id => staffForm(state.cache.staff[id]),
   'staff-toggle': async id => {
@@ -346,10 +347,12 @@ function toggleBell() {
 function apptActions(a) {
   let h = '';
   if (a.status === 'Scheduled') {
-    if (is('doctor')) h += btn('Consult', 'appt-consult', a.id, 'primary');
+    // mirror the server's rules so users only see actions they're allowed to take
+    const ownDoctor = is('doctor') && a.doctor_id === state.user.id;
+    if (ownDoctor) h += btn('Consult', 'appt-consult', a.id, 'primary');
     if (is('admin')) h += btn('Complete', 'appt-complete', a.id);
     if (is('admin', 'receptionist', 'patient')) h += btn('Reschedule', 'appt-reschedule', a.id);
-    h += btn('Cancel', 'appt-cancel', a.id, 'danger');
+    if (is('admin', 'receptionist', 'patient') || ownDoctor) h += btn('Cancel', 'appt-cancel', a.id, 'danger');
   } else if (a.status === 'Completed') {
     if (a.record_id && is('admin', 'doctor', 'patient')) h += btn('Record', 'rec-view-id', a.record_id);
     if (a.bill_id && is('admin', 'accountant', 'receptionist', 'patient')) h += btn('Invoice', 'bill-view', a.bill_id);
@@ -491,7 +494,8 @@ async function pagePatient(id) {
         <div><small>Date of birth</small>${esc(fmtDate(p.dob))}</div><div><small>Blood group</small>${esc(p.blood_group || '—')}</div>
         <div><small>Phone</small>${esc(p.phone)}</div><div><small>Email</small>${esc(p.email || '—')}</div>
         <div><small>Emergency contact</small>${esc(p.emergency_contact || '—')}</div><div><small>Allergies</small>${p.allergies && p.allergies !== 'None' ? `<span class="badge b-cancelled">${esc(p.allergies)}</span>` : esc(p.allergies || '—')}</div>
-        <div><small>Address</small>${esc(p.address || '—')}</div>${d.bills ? `<div><small>Outstanding</small><span class="${unpaid ? 'strong' : ''}" style="color:${unpaid ? 'var(--warn)' : 'inherit'}">${money(unpaid)}</span></div>` : ''}
+        <div><small>Address</small>${esc(p.address || '—')}</div>
+        ${d.account !== undefined ? `<div><small>Portal login</small>${d.account ? `@${esc(d.account.username)}${d.account.active ? '' : ' <span class="muted">(inactive)</span>'}` : btn('Create login', 'patient-account', p.id)}</div>` : ''}${d.bills ?`<div><small>Outstanding</small><span class="${unpaid ? 'strong' : ''}" style="color:${unpaid ? 'var(--warn)' : 'inherit'}">${money(unpaid)}</span></div>` : ''}
       </div></div></div>
     <div class="card"><div class="tabs">${tabs.map(([k, l], i) => `<button type="button" data-tab="${k}" class="${i ? '' : 'active'}">${esc(l)}</button>`).join('')}</div><div id="tabBody"></div></div>`);
   const show = k => {
@@ -530,6 +534,23 @@ function patientForm(p) {
         await api(`/patients/${p.id}`, { method: 'PUT', body: data });
         toast('Patient details updated');
       }
+      refresh();
+    },
+  });
+}
+
+function portalAccountForm(p) {
+  const suggested = p.name.toLowerCase().replace(/[^a-z\s]/g, '').trim().split(/\s+/).slice(0, 2).join('.');
+  openModal({
+    title: `Create portal login — ${p.name}`,
+    submitText: 'Create login',
+    body: `<p class="muted" style="margin-top:0">The patient can sign in to book appointments and view their own records and bills.</p>
+      ${fld('Username', 'username', { req: true, value: suggested, attrs: 'autocomplete="off"' })}
+      ${fld('Temporary password', 'password', { req: true, ph: 'min. 6 characters', attrs: 'autocomplete="new-password"' })}
+      <p class="small muted">Share these with the patient; they can change the password from My Account.</p>`,
+    onSubmit: async data => {
+      const r = await api(`/patients/${p.id}/account`, { method: 'POST', body: data });
+      toast(`Portal login @${r.username} created`);
       refresh();
     },
   });
