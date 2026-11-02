@@ -1,0 +1,29 @@
+{
+  "name": "medicore-hms",
+  "version": "1.0.0",
+  "description": "Hospital Management System – SE Lab project",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --no-warnings server.js",
+    "reset": "node -e \"for (const f of ['hms.db','hms.db-wal','hms.db-shm']) require('fs').rmSync('data/'+f,{force:true})\" && echo Database reset - demo data will be recreated on next start"
+  },
+  "keywords": [
+    "hospital",
+    "hms",
+    "express",
+    "sqlite"
+  ],
+  "author": "Krishnendu Dhar",
+  "license": "MIT",
+  "type": "commonjs",
+  "dependencies": {
+    "express": "^4.22.3"
+  },
+  "engines": {
+    "node": ">=22.5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Krsh-hub/hospital-management-system"
+  }
+}
