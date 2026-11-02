@@ -14,6 +14,9 @@ const fmtDT = s => s ? `${fmtDate(s)}, ${time12(s.slice(11, 16))}` : '';
 const age = dob => { if (!dob) return ''; const b = new Date(dob), n = new Date(); let a = n.getFullYear() - b.getFullYear(); if (n < new Date(n.getFullYear(), b.getMonth(), b.getDate())) a--; return a; };
 const initials = n => String(n || '?').replace(/^Dr\.?\s*/i, '').split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
 const badge = s => `<span class="badge b-${esc(String(s).toLowerCase())}">${esc(s)}</span>`;
+// meta lines are separate spans spaced by CSS, never a dot-joined string
+const parts = (...xs) => `<span class="parts">${xs.filter(x => x || x === 0).map(x => `<span>${x}</span>`).join('')}</span>`;
+const idTag = s => `<span class="id">${esc(s)}</span>`;
 const monthLabel = m => new Date(m + '-01T00:00:00').toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
 const debounce = (fn, ms = 250) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
@@ -38,10 +41,11 @@ const ICONS = {
   printer: '<path d="M6 9V3h12v6M6 18H4v-7h16v7h-2M7 14h10v7H7z"/>',
   alert: '<path d="M12 3 2 21h20zM12 10v5M12 18h.01"/>',
   check: '<path d="m5 12 5 5 9-10"/>',
+  back: '<path d="M15 6l-6 6 6 6"/>',
   heart: '<path d="M20.8 5.6a5.5 5.5 0 0 0-8.8-1.3 5.5 5.5 0 0 0-8.8 6.5L12 21l8.8-10.2a5.5 5.5 0 0 0 0-5.2z"/>',
 };
 const icon = n => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[n] || ''}</svg>`;
-const brandMark = '<span class="brand-mark"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M9.5 3h5v6.5H21v5h-6.5V21h-5v-6.5H3v-5h6.5z" fill="#fff"/></svg></span>';
+const brandMark = '<span class="brand-mark"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M9.5 3h5v6.5H21v5h-6.5V21h-5v-6.5H3v-5h6.5z" fill="currentColor"/></svg></span>';
 
 async function api(path, opts = {}) {
   const res = await fetch('/api' + path, {
@@ -142,7 +146,7 @@ function confirmBox(title, message, okText = 'Confirm', danger = false) {
 }
 
 const btn = (label, act, id, cls = '') => `<button type="button" class="btn sm ${cls}" data-act="${act}" data-id="${esc(id)}">${esc(label)}</button>`;
-const statCard = (ic, tone, val, lbl) => `<div class="card stat"><div class="ic t-${tone}">${icon(ic)}</div><div><div class="val">${val}</div><div class="lbl">${esc(lbl)}</div></div></div>`;
+const statCard = (val, lbl, note) => `<div class="stat"><div class="val">${val}</div><div class="lbl">${esc(lbl)}</div>${note ? `<div class="note">${esc(note)}</div>` : ''}</div>`;
 const empty = msg => `<div class="empty">${esc(msg)}</div>`;
 
 function barList(rows, fmt = x => x) {
@@ -171,7 +175,7 @@ const PAGES = {
   staff: pageStaff, reports: pageReports, notifications: pageNotifications, account: pageAccount, profile: () => pagePatient(state.user.patient_id),
 };
 
-function setTitle(t) { $('#pageTitle').textContent = t; document.title = `${t} · MediCore HMS`; }
+function setTitle(t) { $('#pageTitle').textContent = t; document.title = `${t} – MediCore HMS`; }
 const content = html => { $('#content').innerHTML = html; };
 const refresh = () => route();
 
@@ -179,7 +183,7 @@ async function route() {
   if (!state.user) return;
   const [page = 'dashboard', arg] = location.hash.replace(/^#\/?/, '').split('/');
   const allowed = NAV[role()].map(n => n[0]).concat('account');
-  document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('active', a.dataset.page === page || (page === 'patients' && arg && a.dataset.page === 'profile' && role() === 'patient')));
+  document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('active', a.dataset.page === page || (page === 'patients' && !!arg && a.dataset.page === 'profile' && role() === 'patient')));
   $('#sidebar').classList.remove('open');
   const ownProfile = page === 'patients' && role() === 'patient' && Number(arg) === state.user.patient_id;
   if (!allowed.includes(page) && !ownProfile) {
@@ -246,26 +250,26 @@ const DEMO = [
 
 function renderLogin() {
   clearInterval(state.poll);
-  document.title = 'Sign in · MediCore HMS';
+  document.title = 'Sign in – MediCore HMS';
   $('#app').innerHTML = `<div class="login">
     <section class="login-hero">
       <div class="brand">${brandMark} MediCore HMS</div>
-      <div>
+      <div class="login-pitch">
         <h1>Hospital Management,<br>in one place.</h1>
-        <p>A centralised platform for patient registration, appointments, medical records, billing, notifications and reports — with role-based access for every member of the hospital team.</p>
+        <p class="lead">A centralised platform for patient registration, appointments, medical records, billing, notifications and reports — with role-based access for every member of the hospital team.</p>
         <ul class="hero-list"><li>Patient registration</li><li>Appointment scheduling</li><li>Electronic medical records</li><li>Billing & payments</li><li>Role-based access</li><li>Reports & notifications</li></ul>
       </div>
-      <small style="color:#9fc3ca">Software Engineering Lab Project · Hospital Management System</small>
+      <small class="login-foot">${parts('Software Engineering Lab Project', 'Hospital Management System')}</small>
     </section>
     <section class="login-form-wrap"><div class="login-card">
-      <h2>Welcome back</h2><div class="sub">Sign in to continue to your workspace</div>
+      <h2>Welcome back</h2><p class="sub">Sign in to continue to your workspace</p>
       <form id="loginForm" novalidate>
         <div class="form-error" id="loginErr"></div>
         ${fld('Username', 'username', { attrs: 'autocomplete="username" autofocus' })}
         ${fld('Password', 'password', { type: 'password', attrs: 'autocomplete="current-password"' })}
         <button class="btn primary block" type="submit">Sign in</button>
       </form>
-      <div class="demo"><h4>Demo accounts — click to sign in</h4><div class="demo-grid">
+      <div class="demo"><h3>Demo accounts — click to sign in</h3><div class="demo-grid">
         ${DEMO.map(([u, , r, n]) => `<button class="demo-btn" type="button" data-user="${u}"><b>${esc(r)}</b><span>${esc(n)}</span></button>`).join('')}
       </div></div>
     </div></section></div>`;
@@ -295,14 +299,14 @@ function renderShell() {
     <aside class="sidebar" id="sidebar">
       <div class="brand">${brandMark} MediCore HMS</div>
       <nav class="nav" id="nav">${NAV[u.role].map(([p, l, i]) => `<a href="#/${p}" data-page="${p}">${icon(i)}<span>${esc(l)}</span>${p === 'notifications' ? '<span class="count" id="navCount" hidden></span>' : ''}</a>`).join('')}</nav>
-      <div class="side-foot">Signed in as <b style="color:#fff;text-transform:capitalize">${esc(u.role)}</b><br>MediCore HMS v1.0</div>
+      <div class="side-foot">Signed in as <b class="role-name">${esc(u.role)}</b><br>MediCore HMS v1.0</div>
     </aside>
     <div class="main">
       <header class="topbar">
         <button class="icon-btn menu-btn" id="menuBtn" aria-label="Menu">${icon('menu')}</button>
         <h1 id="pageTitle"></h1><div class="spacer"></div>
         <div style="position:relative"><button class="icon-btn" id="bellBtn" aria-label="Notifications">${icon('bell')}<span class="dot" id="bellDot" hidden></span></button><div id="bellDrop"></div></div>
-        <a class="user-chip" href="#/account" title="My account"><div class="avatar">${esc(initials(u.name))}</div><div class="meta"><b style="color:var(--text)">${esc(u.name)}</b><br><small>${esc(u.role === 'doctor' ? u.specialization || 'doctor' : u.role)}</small></div></a>
+        <a class="user-chip" href="#/account" title="My account"><div class="avatar">${esc(initials(u.name))}</div><div class="meta"><b>${esc(u.name)}</b><br><small>${esc(u.role === 'doctor' ? u.specialization || 'doctor' : u.role)}</small></div></a>
         <button class="icon-btn" id="logoutBtn" title="Log out" aria-label="Log out">${icon('logout')}</button>
       </header>
       <main class="content" id="content"></main>
@@ -321,7 +325,7 @@ async function pollNotifications() {
   if (!state.user) return;
   try {
     const { unread, items } = await api('/notifications');
-    if (unread > state.unread && state.notifSeen !== undefined) toast(`🔔 ${items[0]?.title}: ${items[0]?.message}`);
+    if (unread > state.unread && state.notifSeen !== undefined) toast(`${items[0]?.title}: ${items[0]?.message}`);
     state.unread = unread; state.notifSeen = true; state.notifItems = items;
     const dot = $('#bellDot'), nc = $('#navCount');
     if (dot) { dot.hidden = !unread; dot.textContent = unread > 9 ? '9+' : unread; }
@@ -366,8 +370,8 @@ function apptTable(list, { patient = true, doctor = true } = {}) {
   if (!list.length) return empty('No appointments found');
   return `<div class="table-wrap"><table class="tbl"><thead><tr><th>Date & time</th>${patient ? '<th>Patient</th>' : ''}${doctor ? '<th>Doctor</th>' : ''}<th>Reason</th><th>Status</th><th></th></tr></thead><tbody>
   ${list.map(a => `<tr>
-    <td class="nowrap"><div class="strong">${esc(fmtDate(a.date))}</div><div class="small muted">${esc(time12(a.time))}</div></td>
-    ${patient ? `<td><a href="#/patients/${a.patient_id}" class="strong">${esc(a.patient_name)}</a><div class="small muted">${esc(a.patient_uid)} · ${esc(a.patient_phone)}</div></td>` : ''}
+    <td class="nowrap"><div class="strong">${esc(fmtDate(a.date))}</div><div class="small muted time">${esc(time12(a.time))}</div></td>
+    ${patient ? `<td><a href="#/patients/${a.patient_id}" class="strong">${esc(a.patient_name)}</a><div class="small muted">${parts(idTag(a.patient_uid), esc(a.patient_phone))}</div></td>` : ''}
     ${doctor ? `<td>${esc(a.doctor_name)}<div class="small muted">${esc(a.department || '')}</div></td>` : ''}
     <td>${esc(a.reason || '—')}</td><td>${badge(a.status)}</td><td><div class="actions">${apptActions(a)}</div></td></tr>`).join('')}
   </tbody></table></div>`;
@@ -376,19 +380,19 @@ function apptTable(list, { patient = true, doctor = true } = {}) {
 function apptListItems(list, { showDoctor = true } = {}) {
   cacheRows('appt', list);
   if (!list.length) return empty('No appointments');
-  return list.map(a => `<div class="list-item"><div class="time-pill">${esc(time12(a.time))}</div>
-    <div style="flex:1;min-width:0"><a class="strong" href="#/patients/${a.patient_id}">${esc(a.patient_name)}</a> <span class="small muted">${esc(a.patient_uid)}</span>
-    <div class="small muted">${showDoctor ? esc(a.doctor_name) + ' · ' : ''}${esc(a.reason || a.department || '')}</div></div>
-    ${badge(a.status)}<div class="actions" style="display:flex;gap:6px">${a.status === 'Scheduled' && is('doctor') ? btn('Consult', 'appt-consult', a.id, 'primary') : ''}</div></div>`).join('');
+  return `<ol class="timetable">${list.map(a => `<li class="slot is-${esc(a.status.toLowerCase())}"><time class="slot-time" datetime="${esc(a.time)}">${esc(time12(a.time))}</time>
+    <div class="slot-body"><a class="strong" href="#/patients/${a.patient_id}">${esc(a.patient_name)}</a> ${idTag(a.patient_uid)}
+    <div class="small muted">${parts(showDoctor && esc(a.doctor_name), esc(a.reason || a.department || ''))}</div></div>
+    ${a.status === 'Completed' ? '<span class="stamp">Completed</span>' : badge(a.status)}<div class="actions">${a.status === 'Scheduled' && is('doctor') ? btn('Consult', 'appt-consult', a.id, 'primary') : ''}</div></li>`).join('')}</ol>`;
 }
 
 function billTable(list, { patient = true } = {}) {
   cacheRows('bill', list);
   if (!list.length) return empty('No bills found');
   return `<div class="table-wrap"><table class="tbl"><thead><tr><th>Bill no.</th><th>Date</th>${patient ? '<th>Patient</th>' : ''}<th>Doctor</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead><tbody>
-  ${list.map(b => `<tr><td class="strong nowrap">${esc(b.bill_no)}</td><td class="nowrap">${esc(fmtDate(b.created_at))}</td>
+  ${list.map(b => `<tr><td class="strong nowrap id">${esc(b.bill_no)}</td><td class="nowrap">${esc(fmtDate(b.created_at))}</td>
     ${patient ? `<td><a href="#/patients/${b.patient_id}">${esc(b.patient_name)}</a><div class="small muted">${esc(b.patient_uid)}</div></td>` : ''}
-    <td>${esc(b.doctor_name || '—')}</td><td class="num strong">${money(b.total)}</td>
+    <td>${esc(b.doctor_name || '—')}</td><td class="num strong figure">${money(b.total)}</td>
     <td>${badge(b.status)}${b.payment_method ? `<div class="small muted">${esc(b.payment_method)}</div>` : ''}</td>
     <td><div class="actions">${btn('View', 'bill-view', b.id)}${b.status === 'Unpaid' && is('admin', 'accountant') ? btn('Record payment', 'bill-pay', b.id, 'primary') : ''}</div></td></tr>`).join('')}
   </tbody></table></div>`;
@@ -397,7 +401,7 @@ function billTable(list, { patient = true } = {}) {
 function recordCard(r) {
   const canEdit = is('doctor') && r.doctor_id === state.user.id;
   return `<div class="record"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
-    <div><h4>${esc(r.diagnosis)}</h4><div class="small muted">${esc(fmtDate(r.visit_date))} · ${esc(r.doctor_name)} · ${esc(r.department || '')}</div></div>
+    <div><h4>${esc(r.diagnosis)}</h4><div class="small muted">${parts(esc(fmtDate(r.visit_date)), esc(r.doctor_name), esc(r.department || ''))}</div></div>
     <div style="display:flex;gap:6px">${canEdit ? btn('Edit', 'rec-edit', r.id) : ''}</div></div>
     <dl>${r.symptoms ? `<dt>Symptoms</dt><dd>${esc(r.symptoms)}</dd>` : ''}${r.treatment ? `<dt>Treatment</dt><dd>${esc(r.treatment)}</dd>` : ''}
     ${r.prescription ? `<dt>Prescription</dt><dd>${esc(r.prescription)}</dd>` : ''}${r.notes ? `<dt>Notes</dt><dd>${esc(r.notes)}</dd>` : ''}</dl></div>`;
@@ -408,15 +412,15 @@ async function pageDashboard() {
   setTitle('Dashboard');
   const d = await api('/dashboard');
   const u = state.user;
-  const greet = `<div style="margin-bottom:18px"><h2 style="font-size:21px">Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, ${esc(u.name.split(' ').slice(0, u.role === 'doctor' ? 2 : 1).join(' '))}</h2>
+  const greet = `<div class="greet"><h2>Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, ${esc(u.name.split(' ').slice(0, u.role === 'doctor' ? 2 : 1).join(' '))}</h2>
     <div class="muted">${new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div></div>`;
 
   if (u.role === 'patient') {
     cacheRows('rec', d.records);
     return content(`${greet}
-      <div class="stats">${statCard('calendar', 'blue', d.upcoming.length, 'Upcoming appointments')}${statCard('heart', 'green', d.visits, 'Completed visits')}
-      ${statCard('rupee', d.dues.n ? 'amber' : 'teal', money0(d.dues.amount), `Outstanding (${d.dues.n} bill${d.dues.n === 1 ? '' : 's'})`)}</div>
-      <div class="grid g2">
+      <div class="stats">${statCard(d.upcoming.length, 'Upcoming appointments')}${statCard(d.visits, 'Completed visits')}
+      ${statCard(money0(d.dues.amount), 'Outstanding', `${d.dues.n} bill${d.dues.n === 1 ? '' : 's'}`)}</div>
+      <div class="grid g3">
         <div class="card"><div class="card-head"><h3>Upcoming appointments</h3><button class="btn sm primary" data-act="appt-book">${icon('plus')} Book appointment</button></div>${apptTable(d.upcoming, { patient: false })}</div>
         <div class="card"><div class="card-head"><h3>Recent medical records</h3><a href="#/records" class="small">View all</a></div><div class="card-body">${d.records.length ? d.records.map(recordCard).join('') : empty('No records yet')}</div></div>
       </div>`);
@@ -424,10 +428,10 @@ async function pageDashboard() {
 
   const s = d.stats;
   let stats = '';
-  if (u.role === 'admin') stats = statCard('users', 'teal', s.patients, `Patients (+${s.newPatients} in 30 days)`) + statCard('calendar', 'blue', s.todayTotal, `Today's appointments (${s.todayPending} pending)`) + statCard('staff', 'green', s.doctors, `Active doctors · ${s.staff} staff`) + statCard('rupee', 'green', money0(s.revenueMonth), 'Revenue (last 30 days)') + statCard('alert', 'amber', money0(s.pendingAmount), `Pending dues (${s.pendingBills} bills)`);
-  if (u.role === 'receptionist') stats = statCard('users', 'teal', s.patients, 'Registered patients') + statCard('calendar', 'blue', s.todayTotal, "Today's appointments") + statCard('clock', 'amber', s.todayPending, 'Waiting / pending today') + statCard('calendar', 'green', s.upcoming, 'Upcoming (future days)');
-  if (u.role === 'doctor') stats = statCard('calendar', 'blue', s.todayTotal, "Today's appointments") + statCard('clock', 'amber', s.todayPending, 'Pending consultations') + statCard('calendar', 'teal', s.upcoming, 'Upcoming appointments') + statCard('users', 'green', s.seen, 'Patients treated') + statCard('file', 'teal', s.recordsMonth, 'Records this month');
-  if (u.role === 'accountant') stats = statCard('rupee', 'green', money0(s.revenueToday), 'Collected today') + statCard('chart', 'teal', money0(s.revenueMonth), 'Revenue (last 30 days)') + statCard('alert', 'amber', money0(s.pendingAmount), `Outstanding (${s.pendingBills} bills)`) + statCard('file', 'blue', s.unbilled, 'Consultations awaiting bill');
+  if (u.role === 'admin') stats = statCard(s.patients, 'Patients', `+${s.newPatients} in 30 days`) + statCard(s.todayTotal, "Today's appointments", `${s.todayPending} pending`) + statCard(s.doctors, 'Active doctors', `${s.staff} staff in all`) + statCard(money0(s.revenueMonth), 'Revenue', 'Last 30 days') + statCard(money0(s.pendingAmount), 'Pending dues', `${s.pendingBills} bills`);
+  if (u.role === 'receptionist') stats = statCard(s.patients, 'Registered patients') + statCard(s.todayTotal, "Today's appointments") + statCard(s.todayPending, 'Waiting or pending today') + statCard(s.upcoming, 'Upcoming', 'Future days');
+  if (u.role === 'doctor') stats = statCard(s.todayTotal, "Today's appointments") + statCard(s.todayPending, 'Pending consultations') + statCard(s.upcoming, 'Upcoming appointments') + statCard(s.seen, 'Patients treated') + statCard(s.recordsMonth, 'Records this month');
+  if (u.role === 'accountant') stats = statCard(money0(s.revenueToday), 'Collected today') + statCard(money0(s.revenueMonth), 'Revenue', 'Last 30 days') + statCard(money0(s.pendingAmount), 'Outstanding', `${s.pendingBills} bills`) + statCard(s.unbilled, 'Consultations awaiting bill');
 
   const todayCard = `<div class="card"><div class="card-head"><h3>${u.role === 'doctor' ? 'My schedule today' : "Today's appointments"}</h3>
     ${is('admin', 'receptionist') ? `<button class="btn sm primary" data-act="appt-book">${icon('plus')} Book</button>` : `<a class="small" href="#/appointments">View all</a>`}</div>
@@ -443,9 +447,9 @@ async function pageDashboard() {
   let side = '';
   if (u.role === 'admin') side = `<div class="card"><div class="card-head"><h3>Appointments by department</h3><span class="small muted">Last 30 days</span></div><div class="card-body">${barList(d.byDepartment)}</div></div>`;
   if (u.role === 'receptionist') side = `<div class="card"><div class="card-head"><h3>Recently registered</h3><button class="btn sm" data-act="patient-new">${icon('plus')} Register</button></div>
-    ${d.recentPatients.map(p => `<div class="list-item" data-href="#/patients/${p.id}" style="cursor:pointer"><div class="avatar">${esc(initials(p.name))}</div><div style="flex:1"><div class="strong">${esc(p.name)}</div><div class="small muted">${esc(p.uid)} · ${esc(p.gender)}, ${age(p.dob)} yrs</div></div><span class="small muted">${esc(fmtDate(p.created_at))}</span></div>`).join('')}</div>`;
-  if (u.role === 'doctor') side = `<div class="card"><div class="card-head"><h3>Upcoming</h3></div>${d.upcomingList.length ? d.upcomingList.map(a => `<div class="list-item"><div><div class="strong">${esc(a.patient_name)}</div><div class="small muted">${esc(fmtDate(a.date))} · ${esc(time12(a.time))}</div></div></div>`).join('') : empty('No upcoming appointments')}</div>`;
-  if (u.role === 'accountant') side = `<div class="card"><div class="card-head"><h3>Recent bills</h3><a class="small" href="#/billing">View all</a></div>${cacheRows('bill', d.recentBills).map(b => `<div class="list-item"><div style="flex:1"><div class="strong">${esc(b.bill_no)}</div><div class="small muted">${esc(b.patient_name)}</div></div><div class="strong">${money(b.total)}</div>${badge(b.status)}</div>`).join('')}</div>`;
+    ${d.recentPatients.map(p => `<div class="list-item" data-href="#/patients/${p.id}" style="cursor:pointer"><div class="avatar">${esc(initials(p.name))}</div><div style="flex:1"><div class="strong">${esc(p.name)}</div><div class="small muted">${parts(idTag(p.uid), `${esc(p.gender)}, ${age(p.dob)} yrs`)}</div></div><span class="small muted">${esc(fmtDate(p.created_at))}</span></div>`).join('')}</div>`;
+  if (u.role === 'doctor') side = `<div class="card"><div class="card-head"><h3>Upcoming</h3></div>${d.upcomingList.length ? d.upcomingList.map(a => `<div class="list-item"><div><div class="strong">${esc(a.patient_name)}</div><div class="small muted">${parts(esc(fmtDate(a.date)), `<span class="time">${esc(time12(a.time))}</span>`)}</div></div></div>`).join('') : empty('No upcoming appointments')}</div>`;
+  if (u.role === 'accountant') side = `<div class="card"><div class="card-head"><h3>Recent bills</h3><a class="small" href="#/billing">View all</a></div>${cacheRows('bill', d.recentBills).map(b => `<div class="list-item"><div style="flex:1"><div class="strong id">${esc(b.bill_no)}</div><div class="small muted">${esc(b.patient_name)}</div></div><div class="strong figure">${money(b.total)}</div>${badge(b.status)}</div>`).join('')}</div>`;
 
   content(`${greet}<div class="stats">${stats}</div>
     <div class="grid g3">${u.role === 'accountant' ? revenue : todayCard}<div class="grid" style="align-content:start">${side}</div></div>
@@ -479,10 +483,10 @@ async function pagePatient(id) {
   if (d.bills) tabs.push(['bills', `Bills (${d.bills.length})`]);
   if (d.records) cacheRows('rec', d.records);
   const unpaid = (d.bills || []).filter(b => b.status === 'Unpaid').reduce((s, b) => s + b.total, 0);
-  content(`${role() !== 'patient' ? '<a href="#/patients" class="small">← All patients</a>' : ''}
+  content(`${role() !== 'patient' ? `<a href="#/patients" class="small back">${icon('back')}<span>All patients</span></a>` : ''}
     <div class="card" style="margin:10px 0 18px"><div class="card-body">
       <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
-        <div class="profile"><div class="avatar">${esc(initials(p.name))}</div><div><h2 style="font-size:21px">${esc(p.name)}</h2><div class="muted">${esc(p.uid)} · ${esc(p.gender)} · ${age(p.dob)} years · Registered ${esc(fmtDate(p.created_at))}</div></div></div>
+        <div class="profile"><div class="avatar">${esc(initials(p.name))}</div><div><h2>${esc(p.name)}</h2><div class="muted">${parts(idTag(p.uid), esc(p.gender), `${age(p.dob)} years`, `Registered ${esc(fmtDate(p.created_at))}`)}</div></div></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">
           ${is('admin', 'receptionist') ? btn('Edit details', 'patient-edit', p.id) : ''}
           ${is('admin', 'receptionist') ? `<button class="btn sm primary" data-act="appt-book" data-id="${p.id}">${icon('plus')} Book appointment</button>` : ''}
@@ -493,9 +497,9 @@ async function pagePatient(id) {
       <div class="kv">
         <div><small>Date of birth</small>${esc(fmtDate(p.dob))}</div><div><small>Blood group</small>${esc(p.blood_group || '—')}</div>
         <div><small>Phone</small>${esc(p.phone)}</div><div><small>Email</small>${esc(p.email || '—')}</div>
-        <div><small>Emergency contact</small>${esc(p.emergency_contact || '—')}</div><div><small>Allergies</small>${p.allergies && p.allergies !== 'None' ? `<span class="badge b-cancelled">${esc(p.allergies)}</span>` : esc(p.allergies || '—')}</div>
+        <div><small>Emergency contact</small>${esc(p.emergency_contact || '—')}</div><div><small>Allergies</small>${p.allergies && p.allergies !== 'None' ? `<span class="badge b-allergy">${esc(p.allergies)}</span>` : esc(p.allergies || '—')}</div>
         <div><small>Address</small>${esc(p.address || '—')}</div>
-        ${d.account !== undefined ? `<div><small>Portal login</small>${d.account ? `@${esc(d.account.username)}${d.account.active ? '' : ' <span class="muted">(inactive)</span>'}` : btn('Create login', 'patient-account', p.id)}</div>` : ''}${d.bills ?`<div><small>Outstanding</small><span class="${unpaid ? 'strong' : ''}" style="color:${unpaid ? 'var(--warn)' : 'inherit'}">${money(unpaid)}</span></div>` : ''}
+        ${d.account !== undefined ? `<div><small>Portal login</small>${d.account ? `@${esc(d.account.username)}${d.account.active ? '' : ' <span class="muted">(inactive)</span>'}` : btn('Create login', 'patient-account', p.id)}</div>` : ''}${d.bills ?`<div><small>Outstanding</small><span class="figure ${unpaid ? 'strong' : ''}">${money(unpaid)}</span></div>` : ''}
       </div></div></div>
     <div class="card"><div class="tabs">${tabs.map(([k, l], i) => `<button type="button" data-tab="${k}" class="${i ? '' : 'active'}">${esc(l)}</button>`).join('')}</div><div id="tabBody"></div></div>`);
   const show = k => {
@@ -596,8 +600,8 @@ async function bookAppointment({ patientId } = {}) {
   openModal({
     title: 'Book appointment',
     submitText: 'Confirm booking',
-    body: `${is('patient') ? '' : patientId ? `<div class="field"><label class="f">Patient</label><div class="input" style="background:var(--surface-2)">${esc(pName)}</div><input type="hidden" name="patient_id" value="${patientId}"></div>`
-      : fld('Patient', 'patient_id', { req: true, options: [['', 'Select patient…'], ...patients.slice().sort((a, b) => a.name.localeCompare(b.name)).map(p => [p.id, `${p.name} (${p.uid}) · ${p.phone}`])] })}
+    body: `${is('patient') ? '' : patientId ? `<div class="field"><label class="f">Patient</label><div class="input is-static">${esc(pName)}</div><input type="hidden" name="patient_id" value="${patientId}"></div>`
+      : fld('Patient', 'patient_id', { req: true, options: [['', 'Select patient…'], ...patients.slice().sort((a, b) => a.name.localeCompare(b.name)).map(p => [p.id, `${p.name} (${p.uid}), ${p.phone}`])] })}
       <div class="form-grid">
         ${fld('Department', 'department', { options: [['', 'All departments'], ...deps.map(d => [d.id, d.name])] })}
         ${fld('Doctor', 'doctor_id', { req: true, options: [] })}
@@ -615,7 +619,7 @@ async function bookAppointment({ patientId } = {}) {
       };
       const loadSlots = async () => {
         const doc = docs.find(d => String(d.id) === form.doctor_id.value);
-        $('#feeHint', form).textContent = doc ? `Consultation fee: ${money0(doc.consultation_fee)} · ${doc.department}` : '';
+        $('#feeHint', form).textContent = doc ? `Consultation fee ${money0(doc.consultation_fee)} in ${doc.department}` : '';
         if (!form.doctor_id.value || !form.date.value) { form.time.innerHTML = options([['', 'Select doctor & date first']]); return; }
         if (new Date(form.date.value + 'T00:00:00').getDay() === 0) { form.time.innerHTML = options([['', 'OPD closed on Sundays']]); return; }
         const { slots } = await api(`/appointments/slots?doctor_id=${form.doctor_id.value}&date=${form.date.value}`);
@@ -699,7 +703,7 @@ async function recordForm({ patientId, appointmentId, record } = {}) {
     title: editing ? 'Edit medical record' : 'New medical record',
     submitText: editing ? 'Save changes' : 'Save record',
     wide: true,
-    body: `${editing ? `<p class="muted" style="margin-top:0">${esc(r.patient_name)} · ${esc(fmtDate(r.visit_date))}</p>` : `<div class="form-grid">
+    body: `${editing ? `<p class="muted">${parts(esc(r.patient_name), esc(fmtDate(r.visit_date)))}</p>` : `<div class="form-grid">
         ${fld('Patient', 'patient_id', { req: true, value: patientId, options: [['', 'Select patient…'], ...patients.slice().sort((a, b) => a.name.localeCompare(b.name)).map(p => [p.id, `${p.name} (${p.uid})`])], attrs: patientId ? 'disabled' : '' })}
         ${fld('Appointment', 'appointment_id', { options: [['', 'Walk-in / no appointment']] })}</div>
         <div id="allergyWarn"></div>`}
@@ -716,7 +720,7 @@ async function recordForm({ patientId, appointmentId, record } = {}) {
       const load = async () => {
         const pid = form.patient_id.value;
         const p = patients.find(x => String(x.id) === pid);
-        $('#allergyWarn', form).innerHTML = p && p.allergies && p.allergies !== 'None' ? `<div class="form-error show" style="display:block">⚠ Known allergy: <b>${esc(p.allergies)}</b></div>` : '';
+        $('#allergyWarn', form).innerHTML = p && p.allergies && p.allergies !== 'None' ? `<div class="form-error show allergy">${icon('alert')}<span>Known allergy: <b>${esc(p.allergies)}</b></span></div>` : '';
         if (!pid) { form.appointment_id.innerHTML = options([['', 'Walk-in / no appointment']]); return; }
         const appts = await api(`/appointments?patient_id=${pid}&status=Scheduled&order=asc`);
         form.appointment_id.innerHTML = options([['', 'Walk-in / no appointment'], ...appts.map(a => [a.id, `${fmtDate(a.date)} ${time12(a.time)} — ${a.reason || 'Consultation'}`])], appointmentId);
@@ -749,7 +753,7 @@ async function pageBilling() {
   content(`<div class="stats" id="bstats"></div>
     ${unbilled.length ? `<div class="card" style="margin-bottom:18px"><div class="card-head"><h3>Completed consultations awaiting a bill (${unbilled.length})</h3></div>
       ${unbilled.slice(0, 5).map(a => `<div class="list-item"><div style="flex:1"><span class="strong">${esc(a.patient_name)}</span> <span class="small muted">${esc(a.patient_uid)}</span>
-      <div class="small muted">${esc(fmtDate(a.date))} · ${esc(a.doctor_name)} · fee ${money0(a.consultation_fee)}</div></div>${btn('Generate bill', 'bill-from-appt', a.id, 'primary')}</div>`).join('')}</div>` : ''}
+      <div class="small muted">${parts(esc(fmtDate(a.date)), esc(a.doctor_name), `Fee ${money0(a.consultation_fee)}`)}</div></div>${btn('Generate bill', 'bill-from-appt', a.id, 'primary')}</div>`).join('')}</div>` : ''}
     <div class="toolbar">${!is('patient') ? `<div class="search grow">${icon('search')}<input class="input" id="bq" placeholder="Search bill no., patient name or ID…"></div>` : '<div class="grow"></div>'}
       <select class="input" id="bstatus">${options([['', 'All bills'], ['Unpaid', 'Unpaid'], ['Paid', 'Paid']])}</select>
       ${canCreate ? `<button class="btn primary" data-act="bill-new">${icon('plus')} New bill</button>` : ''}</div>
@@ -758,8 +762,8 @@ async function pageBilling() {
     const p = new URLSearchParams({ status: $('#bstatus').value, q: $('#bq')?.value || '' });
     const list = await api('/bills?' + p);
     const sum = f => list.filter(f).reduce((s, b) => s + b.total, 0);
-    $('#bstats').innerHTML = statCard('bill', 'teal', list.length, 'Bills listed') + statCard('rupee', 'blue', money0(sum(() => true)), 'Total billed')
-      + statCard('check', 'green', money0(sum(b => b.status === 'Paid')), 'Collected') + statCard('alert', 'amber', money0(sum(b => b.status === 'Unpaid')), 'Outstanding');
+    $('#bstats').innerHTML = statCard(list.length, 'Bills listed') + statCard(money0(sum(() => true)), 'Total billed')
+      + statCard(money0(sum(b => b.status === 'Paid')), 'Collected') + statCard(money0(sum(b => b.status === 'Unpaid')), 'Outstanding');
     $('#blist').innerHTML = billTable(list, { patient: !is('patient') });
   };
   $('#bstatus').addEventListener('change', load);
@@ -784,7 +788,7 @@ async function billForm({ patientId, appointmentId } = {}) {
       <label class="f">Bill items</label>
       <table class="tbl items-tbl"><thead><tr><th>Description</th><th>Qty</th><th>Unit price (₹)</th><th></th></tr></thead><tbody id="items">${itemRow()}</tbody></table>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 16px"><button type="button" class="btn sm" id="addItem">${icon('plus')} Add item</button>
-        ${SERVICES.map(([n, p], i) => `<button type="button" class="btn sm" data-svc="${i}" style="color:var(--muted)">+ ${esc(n)}</button>`).join('')}</div>
+        ${SERVICES.map(([n, p], i) => `<button type="button" class="btn sm quiet" data-svc="${i}">+ ${esc(n)}</button>`).join('')}</div>
       <div class="form-grid">${fld('Discount (₹)', 'discount', { type: 'number', value: 0, attrs: 'min="0" step="0.01"' })}${fld('Tax (%)', 'tax_percent', { type: 'number', value: 0, attrs: 'min="0" max="28" step="0.5"' })}</div>
       <div class="totals"><div><span>Subtotal</span><span id="tSub">₹0.00</span></div><div><span>Discount</span><span id="tDis">−₹0.00</span></div><div><span>Tax</span><span id="tTax">₹0.00</span></div><div class="grand"><span>Total</span><span id="tTot">₹0.00</span></div></div>`,
     onOpen: form => {
@@ -840,7 +844,7 @@ function payModal(b) {
   openModal({
     title: `Record payment — ${b.bill_no}`,
     submitText: 'Confirm payment',
-    body: `<p style="margin-top:0">${esc(b.patient_name)} · Amount due <b>${money(b.total)}</b></p>
+    body: `<p>${parts(esc(b.patient_name), `Amount due <b>${money(b.total)}</b>`)}</p>
       ${fld('Payment method', 'payment_method', { req: true, options: [['', 'Select…'], 'Cash', 'UPI', 'Card', 'Insurance'] })}`,
     onSubmit: async data => {
       await api(`/bills/${b.id}/pay`, { method: 'PUT', body: data });
@@ -858,9 +862,9 @@ async function invoiceModal(id) {
     wide: true,
     footer: `<button type="button" class="btn" data-close>Close</button>${b.status === 'Unpaid' && is('admin', 'accountant') ? `<button type="button" class="btn" id="invPay">Record payment</button>` : ''}<button type="button" class="btn primary" id="invPrint">${icon('printer')} Print</button>`,
     body: `<div class="invoice">
-      <div class="inv-head"><div class="brand" style="color:var(--text)">${brandMark} <div>MediCore Hospital<div class="small muted" style="font-weight:400">12 Health Avenue, New Delhi · +91 11 4000 1234</div></div></div>
-        <div style="text-align:right"><h2>INVOICE</h2><div class="strong">${esc(b.bill_no)}</div><div class="small muted">${esc(fmtDT(b.created_at))}</div></div></div>
-      <div class="inv-meta"><div><div class="small muted">Billed to</div><div class="strong">${esc(p.name)}</div><div class="small">${esc(p.uid)} · ${esc(p.phone)}</div><div class="small">${esc(p.address || '')}</div></div>
+      <div class="inv-head"><div class="brand">${brandMark} <div>MediCore Hospital<div class="small muted brand-sub">12 Health Avenue, New Delhi</div><div class="small muted brand-sub">+91 11 4000 1234</div></div></div>
+        <div style="text-align:right"><h2>Invoice</h2><div class="strong id">${esc(b.bill_no)}</div><div class="small muted">${esc(fmtDT(b.created_at))}</div></div></div>
+      <div class="inv-meta"><div><div class="small muted">Billed to</div><div class="strong">${esc(p.name)}</div><div class="small">${parts(idTag(p.uid), esc(p.phone))}</div><div class="small">${esc(p.address || '')}</div></div>
         <div style="text-align:right"><div class="small muted">Status</div>${badge(b.status)}${b.paid_at ? `<div class="small" style="margin-top:4px">Paid via ${esc(b.payment_method)}<br>${esc(fmtDT(b.paid_at))}</div>` : ''}${b.doctor_name ? `<div class="small" style="margin-top:4px">Consultant: ${esc(b.doctor_name)}</div>` : ''}</div></div>
       <table class="tbl"><thead><tr><th>#</th><th>Description</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Amount</th></tr></thead><tbody>
         ${items.map((i, n) => `<tr><td>${n + 1}</td><td>${esc(i.description)}</td><td class="num">${i.qty}</td><td class="num">${money(i.unit_price)}</td><td class="num">${money(i.qty * i.unit_price)}</td></tr>`).join('')}</tbody></table>
@@ -879,8 +883,8 @@ async function pageStaff() {
   const [staff, deps] = await Promise.all([api('/staff'), departments(true)]);
   cacheRows('staff', staff);
   const count = r => staff.filter(s => s.role === r && s.active).length;
-  content(`<div class="stats">${statCard('staff', 'teal', count('doctor'), 'Doctors')}${statCard('users', 'blue', count('receptionist'), 'Receptionists')}
-      ${statCard('rupee', 'green', count('accountant'), 'Accountants')}${statCard('user', 'amber', count('admin'), 'Administrators')}</div>
+  content(`<div class="stats">${statCard(count('doctor'), 'Doctors')}${statCard(count('receptionist'), 'Receptionists')}
+      ${statCard(count('accountant'), 'Accountants')}${statCard(count('admin'), 'Administrators')}</div>
     <div class="grid g3">
       <div class="card"><div class="card-head"><h3>Staff accounts</h3><button class="btn sm primary" data-act="staff-new">${icon('plus')} Add staff</button></div>
         <div class="table-wrap"><table class="tbl"><thead><tr><th>Name</th><th>Role</th><th>Department</th><th>Contact</th><th>Status</th><th></th></tr></thead><tbody>
@@ -907,7 +911,7 @@ async function staffForm(s) {
     body: `<div class="form-grid">
       ${fld('Full name', 'name', { req: true, value: s.name, ph: 'e.g. Dr. Kavita Rao' })}
       ${fld('Role', 'role', { req: true, value: s.role, options: [['doctor', 'Doctor'], ['receptionist', 'Receptionist'], ['accountant', 'Accountant'], ['admin', 'Administrator']] })}
-      ${isNew ? fld('Username', 'username', { req: true, ph: 'used to sign in' }) : `<div class="field"><label class="f">Username</label><div class="input" style="background:var(--surface-2)">@${esc(s.username)}</div></div>`}
+      ${isNew ? fld('Username', 'username', { req: true, ph: 'used to sign in' }) : `<div class="field"><label class="f">Username</label><div class="input is-static">@${esc(s.username)}</div></div>`}
       ${fld(isNew ? 'Password' : 'Reset password', 'password', { type: 'password', req: isNew, ph: isNew ? 'min. 6 characters' : 'leave blank to keep current' })}
       ${fld('Phone', 'phone', { value: s.phone, ph: '10-digit number', attrs: 'maxlength="10"' })}
       ${fld('Email', 'email', { type: 'email', value: s.email })}
@@ -955,8 +959,8 @@ async function pageReports() {
       <a class="btn sm" href="/api/reports/export/appointments">${icon('download')} Appointments</a>
       <a class="btn sm" href="/api/reports/export/bills">${icon('download')} Bills</a>
     </div>
-    <div class="stats">${statCard('rupee', 'green', money0(s.revenue), 'Revenue collected')}${statCard('alert', 'amber', money0(s.outstanding), 'Outstanding dues')}
-      ${statCard('calendar', 'blue', s.appointments, `Appointments (${rate}% completed)`)}${statCard('x', 'red', s.cancelled, 'Cancelled')}${statCard('users', 'teal', s.new_patients, 'New patients')}</div>
+    <div class="stats">${statCard(money0(s.revenue), 'Revenue collected')}${statCard(money0(s.outstanding), 'Outstanding dues')}
+      ${statCard(s.appointments, 'Appointments', `${rate}% completed`)}${statCard(s.cancelled, 'Cancelled')}${statCard(s.new_patients, 'New patients')}</div>
     <div class="grid g2">
       <div class="card"><div class="card-head"><h3>Monthly revenue</h3></div><div class="card-body">${colChart(r.revenueByMonth.map(m => ({ label: monthLabel(m.month), value: m.amount })), money0)}</div></div>
       <div class="card"><div class="card-head"><h3>Appointments by department</h3></div><div class="card-body">${barList(r.byDepartment.map(d => ({ label: d.department, value: d.appointments })))}</div></div>
