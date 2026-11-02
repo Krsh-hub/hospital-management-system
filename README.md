@@ -79,7 +79,7 @@ npm install
 npm start
 ```
 
-Open **http://localhost:3000**.
+Open **http://localhost:3000** for the landing page; the app itself is at **http://localhost:3000/app**.
 
 On the first run, the database (`app/data/hms.db`) is created automatically and filled with about 5 months of realistic demo data: 20 patients, 6 doctors in 6 departments, about 360 appointments, plus the records and bills that go with them.
 

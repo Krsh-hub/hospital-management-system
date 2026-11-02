@@ -6,7 +6,11 @@ const { db, hashPassword, verifyPassword, today, nowStr, SLOTS } = require('./db
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+// "/" is the landing page; the hospital app itself lives at "/app"
+const PUBLIC = path.join(__dirname, 'public');
+app.get('/', (req, res) => res.sendFile(path.join(PUBLIC, 'home', 'index.html')));
+app.get(['/app', '/app/'], (req, res) => res.sendFile(path.join(PUBLIC, 'index.html')));
+app.use(express.static(PUBLIC, { index: false }));
 
 const STAFF = ['admin', 'receptionist', 'doctor', 'accountant'];
 const v = x => (x === undefined || x === '' ? null : typeof x === 'string' ? x.trim() : x);
